@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { formatDatabaseName } from '../utils/formatters';
+import useDebounce from '../hooks/useDebounce';
 
 const TableDataViewer = ({ tableName, onBack }) => {
   const [data, setData] = useState([]);
@@ -9,11 +10,21 @@ const TableDataViewer = ({ tableName, onBack }) => {
   const [currentPage, setCurrentPage] = useState(0);
   const [totalRecords, setTotalRecords] = useState(0);
   const [filters, setFilters] = useState({});
+  const [filterInputs, setFilterInputs] = useState({});
+  
+  // Debounce filter inputs by 500ms
+  const debouncedFilters = useDebounce(filterInputs, 500);
+  
   const pageSize = 50;
 
   useEffect(() => {
     fetchTableSchema();
   }, [tableName]);
+
+  useEffect(() => {
+    // Update actual filters when debounced values change
+    setFilters(debouncedFilters);
+  }, [debouncedFilters]);
 
   useEffect(() => {
     // Reset to first page when filters change
@@ -34,6 +45,7 @@ const TableDataViewer = ({ tableName, onBack }) => {
         initialFilters[column.column_name] = '';
       });
       setFilters(initialFilters);
+      setFilterInputs(initialFilters);
     } catch (error) {
       console.error('Error fetching table schema:', error);
     }
@@ -69,7 +81,7 @@ const TableDataViewer = ({ tableName, onBack }) => {
   };
 
   const handleFilterChange = (column, value) => {
-    setFilters(prev => ({
+    setFilterInputs(prev => ({
       ...prev,
       [column]: value
     }));
@@ -109,7 +121,7 @@ const TableDataViewer = ({ tableName, onBack }) => {
                     type="text"
                     className="filter-input"
                     placeholder="Filter..."
-                    value={filters[column.column_name] || ''}
+                    value={filterInputs[column.column_name] || ''}
                     onChange={(e) => handleFilterChange(column.column_name, e.target.value)}
                   />
                 </th>
