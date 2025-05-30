@@ -12,10 +12,10 @@ const TableDataViewer = ({ tableName, onBack }) => {
   const [filters, setFilters] = useState({});
   const [filterInputs, setFilterInputs] = useState({});
   
-  // Debounce filter inputs by 500ms
-  const debouncedFilters = useDebounce(filterInputs, 500);
+  // Debounce filter inputs by 1000ms (1 second)
+  const debouncedFilters = useDebounce(filterInputs, 1000);
   
-  const pageSize = 50;
+  const pageSize = 30;
 
   useEffect(() => {
     fetchTableSchema();
@@ -87,6 +87,15 @@ const TableDataViewer = ({ tableName, onBack }) => {
     }));
   };
 
+  const clearAllFilters = () => {
+    const clearedFilters = {};
+    schema.forEach(column => {
+      clearedFilters[column.column_name] = '';
+    });
+    setFilterInputs(clearedFilters);
+    setFilters(clearedFilters);
+  };
+
   const totalPages = Math.ceil(totalRecords / pageSize);
 
   if (loading) return <div className="loading">Loading data...</div>;
@@ -96,14 +105,31 @@ const TableDataViewer = ({ tableName, onBack }) => {
       <div className="header">
         <button onClick={onBack}>← Back to Tables</button>
         <h2>{formatDatabaseName(tableName)}</h2>
+        <button onClick={clearAllFilters} className="clear-filters-btn">Clear Filters</button>
       </div>
 
-      <div className="table-info">
-        <div>
-          <span className="record-count">{totalRecords}</span>
-          <span> records found</span>
+      <div className="table-controls">
+        <div className="table-info">
+          <div>
+            <span className="record-count">{totalRecords}</span>
+            <span> records found</span>
+          </div>
         </div>
-        <div>Page {currentPage + 1} of {totalPages || 1}</div>
+        <div className="pagination top-pagination">
+          <button 
+            onClick={() => setCurrentPage(currentPage - 1)} 
+            disabled={currentPage === 0}
+          >
+            Previous
+          </button>
+          <span>Page {currentPage + 1} of {totalPages || 1}</span>
+          <button 
+            onClick={() => setCurrentPage(currentPage + 1)} 
+            disabled={currentPage >= totalPages - 1 || totalPages === 0}
+          >
+            Next
+          </button>
+        </div>
       </div>
 
       <div className="table-container">
