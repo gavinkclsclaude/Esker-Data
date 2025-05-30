@@ -231,4 +231,62 @@ router.delete('/tables/:tableName/data/:id', async (req, res) => {
   }
 });
 
+// Export all filtered data (no pagination)
+router.get('/tables/:tableName/export', async (req, res) => {
+  try {
+    const { tableName } = req.params;
+    const { filters } = req.query;
+    
+    // Validate table name to prevent SQL injection
+    const tableCheck = await db.query(
+      'SELECT 1 FROM information_schema.tables WHERE table_schema = $1 AND table_name = $2',
+      ['esker', tableName]
+    );
+    
+    if (tableCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Table not found' });
+    }
+    
+    // Parse filters if provided
+    let filterObj = {};
+    if (filters) {
+      try {
+        filterObj = JSON.parse(filters);
+      } catch (e) {
+        console.error('Invalid filters JSON:', e);
+      }
+    }
+    
+    // Build WHERE clause for filters
+    let whereClause = '';
+    const whereConditions = [];
+    const queryParams = [];
+    let paramIndex = 1;
+    
+    Object.entries(filterObj).forEach(([column, value]) => {
+      if (value && value.trim() !== '') {
+        whereConditions.push(`LOWER(CAST(${column} AS TEXT)) LIKE LOWER($${paramIndex})`);
+        queryParams.push(`%${value}%`);
+        paramIndex++;
+      }
+    });
+    
+    if (whereConditions.length > 0) {
+      whereClause = ' WHERE ' + whereConditions.join(' AND ');
+    }
+    
+    // Get all filtered data (no limit)
+    const dataQuery = `SELECT * FROM esker.${tableName}${whereClause}`;
+    const result = await db.query(dataQuery, queryParams);
+    
+    res.json({
+      data: result.rows,
+      totalRecords: result.rows.length
+    });
+  } catch (error) {
+    console.error('Error exporting data:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

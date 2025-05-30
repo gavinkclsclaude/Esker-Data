@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { formatDatabaseName } from '../utils/formatters';
 import useDebounce from '../hooks/useDebounce';
+import { API_URL } from '../config';
+import RowDetailModal from './RowDetailModal';
+import { exportToCSV, exportToExcel } from '../utils/exportUtils';
 
 const TableDataViewer = ({ tableName, onBack }) => {
   const [data, setData] = useState([]);
@@ -11,6 +14,7 @@ const TableDataViewer = ({ tableName, onBack }) => {
   const [totalRecords, setTotalRecords] = useState(0);
   const [filters, setFilters] = useState({});
   const [filterInputs, setFilterInputs] = useState({});
+  const [selectedRow, setSelectedRow] = useState(null);
   
   // Debounce filter inputs by 1000ms (1 second)
   const debouncedFilters = useDebounce(filterInputs, 1000);
@@ -37,7 +41,7 @@ const TableDataViewer = ({ tableName, onBack }) => {
 
   const fetchTableSchema = async () => {
     try {
-      const response = await axios.get(`http://localhost:5000/api/tables/${tableName}/schema`);
+      const response = await axios.get(`${API_URL}/tables/${tableName}/schema`);
       setSchema(response.data);
       // Initialize filters for each column
       const initialFilters = {};
@@ -63,7 +67,7 @@ const TableDataViewer = ({ tableName, onBack }) => {
         }
       });
       
-      const response = await axios.get(`http://localhost:5000/api/tables/${tableName}/data`, {
+      const response = await axios.get(`${API_URL}/tables/${tableName}/data`, {
         params: {
           limit: pageSize,
           offset: currentPage * pageSize,
@@ -96,6 +100,37 @@ const TableDataViewer = ({ tableName, onBack }) => {
     setFilters(clearedFilters);
   };
 
+  const handleExport = async (format) => {
+    try {
+      // Show loading or disable buttons
+      const activeFilters = Object.entries(filters).reduce((acc, [key, value]) => {
+        if (value && value.trim() !== '') {
+          acc[key] = value;
+        }
+        return acc;
+      }, {});
+
+      // Fetch all data with current filters
+      const response = await axios.get(`${API_URL}/tables/${tableName}/export`, {
+        params: {
+          filters: JSON.stringify(activeFilters)
+        }
+      });
+
+      const exportData = response.data.data;
+      const filename = `${tableName}_${new Date().toISOString().split('T')[0]}`;
+
+      if (format === 'csv') {
+        exportToCSV(exportData, schema, filename);
+      } else if (format === 'excel') {
+        exportToExcel(exportData, schema, filename);
+      }
+    } catch (error) {
+      console.error('Error exporting data:', error);
+      alert('Failed to export data. Please try again.');
+    }
+  };
+
   const totalPages = Math.ceil(totalRecords / pageSize);
 
   if (loading) return <div className="loading">Loading data...</div>;
@@ -105,7 +140,23 @@ const TableDataViewer = ({ tableName, onBack }) => {
       <div className="header">
         <button onClick={onBack}>← Back to Tables</button>
         <h2>{formatDatabaseName(tableName)}</h2>
-        <button onClick={clearAllFilters} className="clear-filters-btn">Clear Filters</button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <button 
+            onClick={() => handleExport('csv')} 
+            style={{ background: '#2e7d32', color: 'white', border: 'none' }}
+            title="Export to CSV"
+          >
+            Export CSV
+          </button>
+          <button 
+            onClick={() => handleExport('excel')} 
+            style={{ background: '#1976d2', color: 'white', border: 'none' }}
+            title="Export to Excel"
+          >
+            Export Excel
+          </button>
+          <button onClick={clearAllFilters} className="clear-filters-btn">Clear Filters</button>
+        </div>
       </div>
 
       <div className="table-controls">
@@ -136,11 +187,13 @@ const TableDataViewer = ({ tableName, onBack }) => {
         <table>
           <thead>
             <tr>
+              <th style={{ width: '50px' }}>Actions</th>
               {schema.map((column) => (
                 <th key={column.column_name}>{formatDatabaseName(column.column_name)}</th>
               ))}
             </tr>
             <tr className="filter-row">
+              <th></th>
               {schema.map((column) => (
                 <th key={`filter-${column.column_name}`}>
                   <input
@@ -157,6 +210,18 @@ const TableDataViewer = ({ tableName, onBack }) => {
           <tbody>
             {data.map((row, index) => (
               <tr key={index}>
+                <td>
+                  <button
+                    className="detail-btn"
+                    onClick={() => setSelectedRow(row)}
+                    title="View details"
+                  >
+                    <svg viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                      <path fillRule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                </td>
                 {schema.map((column) => (
                   <td key={column.column_name}>
                     {row[column.column_name] !== null ? String(row[column.column_name]) : ''}
@@ -166,7 +231,7 @@ const TableDataViewer = ({ tableName, onBack }) => {
             ))}
             {data.length === 0 && (
               <tr>
-                <td colSpan={schema.length} style={{ textAlign: 'center', padding: '20px' }}>
+                <td colSpan={schema.length + 1} style={{ textAlign: 'center', padding: '20px' }}>
                   No records found
                 </td>
               </tr>
@@ -190,6 +255,14 @@ const TableDataViewer = ({ tableName, onBack }) => {
           Next
         </button>
       </div>
+      
+      {selectedRow && (
+        <RowDetailModal
+          row={selectedRow}
+          columns={schema}
+          onClose={() => setSelectedRow(null)}
+        />
+      )}
     </div>
   );
 };
