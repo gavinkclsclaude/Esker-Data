@@ -4,7 +4,6 @@ import { formatDatabaseName } from '../utils/formatters';
 
 const TableDataViewer = ({ tableName, onBack }) => {
   const [data, setData] = useState([]);
-  const [filteredData, setFilteredData] = useState([]);
   const [schema, setSchema] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(0);
@@ -14,13 +13,16 @@ const TableDataViewer = ({ tableName, onBack }) => {
 
   useEffect(() => {
     fetchTableSchema();
-    fetchTableData();
-  }, [tableName, currentPage]);
+  }, [tableName]);
 
   useEffect(() => {
-    // Apply filters whenever data or filters change
-    applyFilters();
-  }, [data, filters]);
+    // Reset to first page when filters change
+    setCurrentPage(0);
+  }, [filters]);
+
+  useEffect(() => {
+    fetchTableData();
+  }, [tableName, currentPage, filters]);
 
   const fetchTableSchema = async () => {
     try {
@@ -40,12 +42,23 @@ const TableDataViewer = ({ tableName, onBack }) => {
   const fetchTableData = async () => {
     try {
       setLoading(true);
+      
+      // Build filter params - only include non-empty filters
+      const activeFilters = {};
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value && value.trim() !== '') {
+          activeFilters[key] = value;
+        }
+      });
+      
       const response = await axios.get(`http://localhost:5000/api/tables/${tableName}/data`, {
         params: {
           limit: pageSize,
-          offset: currentPage * pageSize
+          offset: currentPage * pageSize,
+          filters: JSON.stringify(activeFilters)
         }
       });
+      
       setData(response.data.data);
       setTotalRecords(response.data.total);
       setLoading(false);
@@ -53,28 +66,6 @@ const TableDataViewer = ({ tableName, onBack }) => {
       console.error('Error fetching table data:', error);
       setLoading(false);
     }
-  };
-
-  const applyFilters = () => {
-    let filtered = [...data];
-    
-    Object.entries(filters).forEach(([column, filterValue]) => {
-      if (filterValue) {
-        filtered = filtered.filter(row => {
-          const cellValue = row[column];
-          if (cellValue === null || cellValue === undefined) return false;
-          
-          // Convert to string for comparison
-          const cellStr = String(cellValue).toLowerCase();
-          const filterStr = filterValue.toLowerCase();
-          
-          // Use includes for partial matching
-          return cellStr.includes(filterStr);
-        });
-      }
-    });
-    
-    setFilteredData(filtered);
   };
 
   const handleFilterChange = (column, value) => {
@@ -97,10 +88,10 @@ const TableDataViewer = ({ tableName, onBack }) => {
 
       <div className="table-info">
         <div>
-          <span className="record-count">{filteredData.length}</span>
-          <span> records shown (of {totalRecords} total)</span>
+          <span className="record-count">{totalRecords}</span>
+          <span> records found</span>
         </div>
-        <div>Page {currentPage + 1} of {totalPages}</div>
+        <div>Page {currentPage + 1} of {totalPages || 1}</div>
       </div>
 
       <div className="table-container">
@@ -126,7 +117,7 @@ const TableDataViewer = ({ tableName, onBack }) => {
             </tr>
           </thead>
           <tbody>
-            {filteredData.map((row, index) => (
+            {data.map((row, index) => (
               <tr key={index}>
                 {schema.map((column) => (
                   <td key={column.column_name}>
@@ -135,6 +126,13 @@ const TableDataViewer = ({ tableName, onBack }) => {
                 ))}
               </tr>
             ))}
+            {data.length === 0 && (
+              <tr>
+                <td colSpan={schema.length} style={{ textAlign: 'center', padding: '20px' }}>
+                  No records found
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -146,10 +144,10 @@ const TableDataViewer = ({ tableName, onBack }) => {
         >
           Previous
         </button>
-        <span>Page {currentPage + 1} of {totalPages}</span>
+        <span>Page {currentPage + 1} of {totalPages || 1}</span>
         <button 
           onClick={() => setCurrentPage(currentPage + 1)} 
-          disabled={currentPage >= totalPages - 1}
+          disabled={currentPage >= totalPages - 1 || totalPages === 0}
         >
           Next
         </button>

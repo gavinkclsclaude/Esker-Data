@@ -41,10 +41,10 @@ router.get('/tables/:tableName/schema', async (req, res) => {
   }
 });
 
-// Get all records from a specific table
+// Get all records from a specific table with filtering
 router.get('/tables/:tableName/data', async (req, res) => {
   const { tableName } = req.params;
-  const { limit = 100, offset = 0 } = req.query;
+  const { limit = 100, offset = 0, filters } = req.query;
   
   try {
     // Validate table name to prevent SQL injection
@@ -57,14 +57,45 @@ router.get('/tables/:tableName/data', async (req, res) => {
       return res.status(404).json({ error: 'Table not found' });
     }
     
-    const result = await db.query(
-      `SELECT * FROM esker.${tableName} LIMIT $1 OFFSET $2`,
-      [limit, offset]
-    );
+    // Parse filters if provided
+    let filterObj = {};
+    if (filters) {
+      try {
+        filterObj = JSON.parse(filters);
+      } catch (e) {
+        console.error('Invalid filters JSON:', e);
+      }
+    }
     
-    const countResult = await db.query(
-      `SELECT COUNT(*) FROM esker.${tableName}`
-    );
+    // Build WHERE clause for filters
+    let whereClause = '';
+    const whereConditions = [];
+    const queryParams = [];
+    let paramIndex = 1;
+    
+    Object.entries(filterObj).forEach(([column, value]) => {
+      if (value && value.trim() !== '') {
+        whereConditions.push(`LOWER(CAST(${column} AS TEXT)) LIKE LOWER($${paramIndex})`);
+        queryParams.push(`%${value}%`);
+        paramIndex++;
+      }
+    });
+    
+    if (whereConditions.length > 0) {
+      whereClause = ' WHERE ' + whereConditions.join(' AND ');
+    }
+    
+    // Get filtered data
+    const dataQuery = `SELECT * FROM esker.${tableName}${whereClause} LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
+    queryParams.push(limit, offset);
+    
+    const result = await db.query(dataQuery, queryParams);
+    
+    // Get filtered count
+    const countQuery = `SELECT COUNT(*) FROM esker.${tableName}${whereClause}`;
+    const countParams = queryParams.slice(0, -2); // Remove limit and offset
+    
+    const countResult = await db.query(countQuery, countParams);
     
     res.json({
       data: result.rows,
