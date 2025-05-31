@@ -1,5 +1,7 @@
 # Full-Stack CRUD Application
 
+**GitHub Repository**: https://github.com/gavinkclsclaude/Esker-Data
+
 A full-stack web application with React frontend and Node.js/Express backend for performing CRUD operations on a PostgreSQL database.
 
 ## Prerequisites
@@ -97,4 +99,53 @@ fullstack-crud-app/
     │   ├── App.js             # Main App component
     │   └── App.css            # Styles
     └── package.json
+```
+
+## Contributing & Version Control
+
+### Repository Information
+- **GitHub URL**: https://github.com/gavinkclsclaude/Esker-Data
+- **Clone**: `git clone https://github.com/gavinkclsclaude/Esker-Data.git`
+
+### Setting Up Git
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/gavinkclsclaude/Esker-Data.git
+   cd Esker-Data
+   ```
+
+2. Configure Git (if not already done):
+   ```bash
+   git config --global user.name "Your Name"
+   git config --global user.email "your.email@example.com"
+   ```
+
+### Making Changes
+1. Create a new branch for your feature:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+2. Make your changes and commit:
+   ```bash
+   git add .
+   git commit -m "Description of your changes"
+   ```
+
+3. Push your branch:
+   ```bash
+   git push -u origin feature/your-feature-name
+   ```
+
+4. Create a pull request on GitHub
+
+### Keeping Your Fork Up to Date
+```bash
+# Add upstream remote (if working from a fork)
+git remote add upstream https://github.com/gavinkclsclaude/Esker-Data.git
+
+# Fetch and merge upstream changes
+git fetch upstream
+git checkout main
+git merge upstream/main
 ```
